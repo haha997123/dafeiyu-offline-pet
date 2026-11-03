@@ -103,7 +103,7 @@ class CarePanelTests(unittest.TestCase):
 
     def test_buttons_have_stable_names_and_card_remains_compact(self):
         buttons = self.panel.findChildren(QPushButton)
-        self.assertEqual(len(buttons), 14)
+        self.assertEqual(len(buttons), 16)
         names = [button.objectName() for button in buttons]
         self.assertTrue(all(names))
         self.assertEqual(len(names), len(set(names)))

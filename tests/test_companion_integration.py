@@ -18,13 +18,13 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 from PySide6.QtCore import QCoreApplication, QEvent, QTimer
 from PySide6.QtCore import Qt, QPoint, QPointF, QRect
+from PySide6.QtGui import QMouseEvent
 from PySide6.QtTest import QTest
 from PySide6.QtWidgets import QApplication
 
 from app.paths import AppPaths
 from companion.window import CompanionPetWindow
 from settings.config import ConfigManager
-from pet.interaction import InteractionOutcome
 from types import SimpleNamespace
 
 
@@ -86,7 +86,10 @@ class CompanionIntegrationTests(unittest.TestCase):
         config.set_nested("awareness", "enabled", False)
         config.set_nested("comfort", "desktop_surfaces", False)
         config.set_nested("updates", "enabled", False)
-        window = CompanionPetWindow(paths, config)
+        # The startup singleShot belongs to a top-level callback, so stopping
+        # child timers cannot cancel it after a test closes this window.
+        with patch.object(CompanionPetWindow, "_show_startup_recovery_line"):
+            window = CompanionPetWindow(paths, config)
         self.windows.append(window)
         # Control elapsed care time without waiting, while keeping the real
         # SQLite connection, controller, widgets, and source assets in place.
@@ -127,6 +130,45 @@ class CompanionIntegrationTests(unittest.TestCase):
 
     def events_of_kind(self, kind):
         return [event for event in self.window.companion_store.snapshot()["events"] if event["kind"] == kind]
+
+    def send_pet_mouse(self, event_type, position):
+        """Deliver real Qt mouse events without moving the machine's cursor."""
+        moving = event_type == QEvent.Type.MouseMove
+        released = event_type == QEvent.Type.MouseButtonRelease
+        event = QMouseEvent(
+            event_type,
+            QPointF(self.window.mapFromGlobal(position)),
+            QPointF(position),
+            Qt.MouseButton.NoButton if moving else Qt.MouseButton.LeftButton,
+            Qt.MouseButton.NoButton if released else Qt.MouseButton.LeftButton,
+            Qt.KeyboardModifier.NoModifier,
+        )
+        self.assertTrue(QCoreApplication.sendEvent(self.window, event))
+
+    def drag_pet(self):
+        window = self.window
+        original = QPoint(window.pos())
+        start = window.mapToGlobal(QPoint(window.width() // 2, window.height() // 2))
+        threshold = max(10, QApplication.startDragDistance())
+        first_move = start + QPoint(threshold + 1, 0)
+        drop = first_move + QPoint(60, 30)
+        self.send_pet_mouse(QEvent.Type.MouseButtonPress, start)
+        self.assertTrue(window.interaction.active)
+        self.send_pet_mouse(QEvent.Type.MouseMove, first_move)
+        self.assertTrue(window.interaction.dragging)
+        self.assertEqual(window.pos(), original + QPoint(threshold + 1, 0))
+        self.send_pet_mouse(QEvent.Type.MouseMove, drop)
+        self.assertEqual(window.pos(), original + QPoint(threshold + 61, 30))
+        self.send_pet_mouse(QEvent.Type.MouseButtonRelease, drop)
+        self.assertFalse(window.interaction.active)
+        self.assertFalse(window.interaction.dragging)
+        return QPoint(window.pos())
+
+    def assert_movement_mode(self, mode):
+        self.assertEqual(self.window.movement.mode, mode)
+        self.assertEqual(self.window.config.get("mode"), mode)
+        saved = ConfigManager(self.window.paths.config_path)
+        self.assertEqual(saved.get("mode"), mode)
 
     def test_hub_feed_signal_records_one_specific_chinese_food(self):
         before = self.window.companion_store.snapshot()
@@ -281,27 +323,51 @@ class CompanionIntegrationTests(unittest.TestCase):
         self.assertTrue(self.window.hub.isVisible())
         self.assertEqual(self.window.hub.stack.currentWidget(), self.window.hub._pages["settings"])
 
-    def test_drag_release_floats_at_drop_point_and_survives_size_change(self):
+    def test_real_floating_follow_drag_preserves_follow_size_and_restart(self):
         window = self.window
         area = self.application.primaryScreen().availableGeometry()
         point = QPoint(area.left() + 100, area.top() + 45)
         window.move(point)
         window.set_mode("follow")
-        outcome = InteractionOutcome("drag", "head", 1400, 900, 1.0)
-        event = SimpleNamespace(button=lambda: Qt.MouseButton.LeftButton,
-                                globalPosition=lambda: QPointF(300, 200))
-        with patch.object(window.interaction, "release", return_value=outcome):
-            window.mouseReleaseEvent(event)
-        self.assertEqual(window.pos(), point)
-        self.assertEqual(window.movement.mode, "still")
+        drop_point = self.drag_pet()
+        self.assertEqual(drop_point, point + QPoint(max(10, QApplication.startDragDistance()) + 61, 30))
+        self.assert_movement_mode("follow")
         self.assertFalse(window.physics.active)
-        self.assertEqual(window.config.get("y"), point.y())
+        self.assertEqual(window.config.get("y"), drop_point.y())
         window.set_size(0.55)
-        self.assertEqual(window.pos(), point)
+        self.assertEqual(window.pos(), drop_point)
+        self.assert_movement_mode("follow")
         self.dispose_window(window)
         self.window = self.make_window()
+        self.assertEqual(self.window.pos(), drop_point)
+        self.assert_movement_mode("follow")
+
+    def test_real_floating_drag_stops_wander_and_keeps_still_at_drop_point(self):
+        area = self.application.primaryScreen().availableGeometry()
+        for mode in ("wander", "still"):
+            with self.subTest(mode=mode):
+                self.window.move(area.topLeft() + QPoint(70, 45))
+                self.window.set_mode(mode)
+                drop_point = self.drag_pet()
+                self.assert_movement_mode("still")
+                self.assertFalse(self.window.physics.active)
+                self.assertEqual(self.window.pos(), drop_point)
+                self.assertEqual(self.window.config.get("x"), drop_point.x())
+                self.assertEqual(self.window.config.get("y"), drop_point.y())
+
+    def test_real_click_with_eight_pixel_jitter_does_not_drop_or_cancel_follow(self):
+        self.window.set_mode("follow")
+        point = QPoint(self.window.pos())
+        start = self.window.mapToGlobal(QPoint(self.window.width() // 2, self.window.height() // 2))
+        with patch.object(self.window, "_settle_floating_drag", wraps=self.window._settle_floating_drag) as settle:
+            self.send_pet_mouse(QEvent.Type.MouseButtonPress, start)
+            self.send_pet_mouse(QEvent.Type.MouseMove, start + QPoint(8, 0))
+            self.assertFalse(self.window.interaction.dragging)
+            self.send_pet_mouse(QEvent.Type.MouseButtonRelease, start + QPoint(8, 0))
+            settle.assert_not_called()
         self.assertEqual(self.window.pos(), point)
-        self.assertEqual(self.window.movement.mode, "still")
+        self.assert_movement_mode("follow")
+        self.assertTrue(self.window._click_timer.isActive())
 
     def test_gravity_is_available_as_an_explicit_option(self):
         self.window.set_placement("gravity")
@@ -310,16 +376,50 @@ class CompanionIntegrationTests(unittest.TestCase):
         self.assertFalse(self.window.physics.active)
         self.assertTrue(self.window.movement.free_vertical)
 
-    def test_return_to_primary_uses_primary_work_area_and_stops_following(self):
+    def test_return_to_primary_uses_primary_work_area_and_preserves_each_mode(self):
         area = QRect(1000, 200, 1200, 900)
         primary = SimpleNamespace(availableGeometry=lambda: area)
-        self.window.move(-500, -500)
-        self.window.set_mode("follow")
-        with patch("pet.window.QApplication.primaryScreen", return_value=primary):
-            self.window.move_to_primary_screen()
-        self.assertTrue(area.contains(self.window.geometry()))
-        self.assertEqual(self.window.geometry().center(), area.center())
-        self.assertEqual(self.window.movement.mode, "still")
+        for mode in ("follow", "wander", "still"):
+            with self.subTest(mode=mode):
+                self.window.move(-500, -500)
+                self.window.set_mode(mode)
+                self.window.movement.target = (500, 500)
+                with patch("pet.window.QApplication.primaryScreen", return_value=primary):
+                    self.window.move_to_primary_screen()
+                self.assertTrue(area.contains(self.window.geometry()))
+                center_offset = self.window.geometry().center() - area.center()
+                self.assertLessEqual(abs(center_offset.x()), 1)
+                self.assertLessEqual(abs(center_offset.y()), 1)
+                self.assertIsNone(self.window.movement.target)
+                self.assert_movement_mode(mode)
+
+    def test_follow_survives_repeated_ticks_feeding_settings_and_size(self):
+        window = self.window
+        area = self.application.primaryScreen().availableGeometry()
+        window.move(area.topLeft() + QPoint(30, 30))
+        window.set_hover_pause(False)
+        window.set_mode("follow")
+        cursor = SimpleNamespace(pos=lambda: area.bottomRight() - QPoint(20, 20))
+        with patch.object(window, "cursor", return_value=cursor), \
+             patch.object(window.movement, "update", wraps=window.movement.update) as movement_update:
+            for _ in range(6):
+                window.tick()
+                self.assert_movement_mode("follow")
+            self.assertGreater(movement_update.call_count, 0)
+            window.hub.interaction_requested.emit("feed", "白饭")
+            self.assert_movement_mode("follow")
+            window.open_hub("settings")
+            window.hub.voice_auto.setChecked(not window.hub.voice_auto.isChecked())
+            window.hub.settings_changed.emit()
+            self.assert_movement_mode("follow")
+            window.hub.hide()
+            window.set_reduced_motion(True)
+            window.set_reduced_motion(False)
+            window.set_size(0.55)
+            window.set_walk_speed(104)
+            for _ in range(12):
+                window.tick()
+                self.assert_movement_mode("follow")
 
     def test_reduced_motion_freezes_actual_continuous_frames(self):
         self.window.set_mode("still")

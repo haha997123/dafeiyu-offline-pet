@@ -720,7 +720,8 @@ class PetWindow(QWidget):
         if self._drag_offset is None:
             self._click_timer.stop()
             self._hold_timer.stop()
-            self._drag_offset = position - QPoint(self.x(), self.y())
+            press_position = self._drag_last_pos if self._drag_last_pos is not None else position
+            self._drag_offset = press_position - QPoint(self.x(), self.y())
             self.physics.cancel()
             self.surface_tracker.detach()
             self._request_action(
@@ -1099,12 +1100,17 @@ class PetWindow(QWidget):
         self.physics.cancel()
         self.surface_tracker.detach()
         self.movement.free_vertical = True
-        self.set_mode("still")
+        # Placing the pet must not overwrite an explicitly selected follow mode.
+        # Consult the saved choice because focus temporarily pauses movement.
+        keep_following = self.config.get("mode") == "follow"
+        self.movement.cancel_target()
+        if not keep_following:
+            self.set_mode("still")
         self.snap_into_screen()
         self._set_direction("down")
         self._request_action(PetAction.IDLE, reason="placed_by_user", force=True, immediate=True)
         self.save_snapshot()
-        self.say("就待在这里陪你啦。", preserve_action=True)
+        self.say("放好啦，等你移动鼠标我继续跟着。" if keep_following else "就待在这里陪你啦。", preserve_action=True)
 
     def set_activity_level(self, level: str) -> None:
         level = ActivityDirector._normalized_activity_level(level)
@@ -1178,8 +1184,7 @@ class PetWindow(QWidget):
         self._interrupt_activity()
         self.physics.cancel()
         self.surface_tracker.detach()
-        if self._placement() == "floating":
-            self.set_mode("still")
+        self.movement.cancel_target()
         geometry = screen.availableGeometry()
         self.move(geometry.left() + max(0, (geometry.width() - self.width()) // 2),
                   geometry.top() + max(0, (geometry.height() - self.height()) // 2))

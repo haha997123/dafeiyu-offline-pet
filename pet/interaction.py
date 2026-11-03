@@ -5,7 +5,7 @@ from dataclasses import dataclass
 
 from PySide6.QtCore import QPoint
 from PySide6.QtGui import QFont
-from PySide6.QtWidgets import QHBoxLayout, QToolButton, QWidget
+from PySide6.QtWidgets import QApplication, QHBoxLayout, QToolButton, QWidget
 from PySide6.QtCore import Qt
 
 
@@ -94,7 +94,8 @@ class InteractionController:
             return False
         self._samples.append((time.monotonic(), position))
         self._samples = self._samples[-18:]
-        if not self.dragging and (position - self._press_pos).manhattanLength() > 6:
+        drag_distance = max(10, QApplication.startDragDistance()) if QApplication.instance() else 10
+        if not self.dragging and (position - self._press_pos).manhattanLength() > drag_distance:
             self.dragging = True
         return self.dragging
 

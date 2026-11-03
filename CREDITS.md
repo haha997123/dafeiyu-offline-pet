@@ -50,3 +50,7 @@ QCYTSN 项目的旧人物图像、运行时状态 PNG、旧图标、三视图、
 ## 运行库
 
 感谢 Python、Qt/PySide、Pillow、psutil、PyInstaller 及其依赖的维护者。完整依赖与许可见 [THIRD_PARTY_NOTICES_DIARY.md](THIRD_PARTY_NOTICES_DIARY.md) 和发布包的 `licenses/`。
+
+## 新增的本地提示音
+
+`assets/chimes/reminder.wav` 为本项目用正弦波合成的原创短提示音，随代码按 MIT 许可提供。

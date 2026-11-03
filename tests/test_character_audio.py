@@ -21,7 +21,7 @@ def test_character_pack_has_real_pcm_samples_and_manual_preview_works():
                 assert any(sound.readframes(sound.getnframes()))
         service.configure(True, automatic=False)
         with patch.object(service._player, "play") as play:
-            assert service.play("preview", automatic=False) == "我一直都在这里的哦。"
+            assert service.play("preview", automatic=False) in {clip["text"] for clip in service._clips}
             play.assert_called_once()
             assert not service.play("idle", automatic=True)
     finally:
@@ -50,12 +50,12 @@ def test_rejected_synthetic_voices_are_removed_and_legacy_choice_falls_back():
     root = Path(__file__).resolve().parents[1] / "assets/voicepack"
     service = VoicePackService(root)
     try:
-        assert {voice["id"] for voice in service.voices} == {"community"}
+        assert {voice["id"] for voice in service.voices} == {"community", "community-full"}
         assert not (root / "styles").exists()
         service.configure(True, voice_id="cute")
         assert service.voice_id == "community"
         with patch.object(service._player, "play"):
-            assert service.play("preview") == "我一直都在这里的哦。"
-            assert Path(service._player.source().toLocalFile()) == root / "click4.wav"
+            assert service.play("preview") in {clip["text"] for clip in service._clips}
+            assert Path(service._player.source().toLocalFile()) in {clip["path"] for clip in service._clips}
     finally:
         service.close()

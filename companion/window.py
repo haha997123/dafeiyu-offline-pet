@@ -2,16 +2,19 @@ from __future__ import annotations
 
 import logging
 import os
+import random
 import time
 from datetime import datetime
 from pathlib import Path
 
-from PySide6.QtCore import QTimer, Qt
+from PySide6.QtCore import QTimer, Qt, QUrl
 from PySide6.QtGui import QIcon
+from PySide6.QtMultimedia import QSoundEffect
 from PySide6.QtWidgets import QApplication, QDialog, QLabel, QMenu, QPushButton, QSystemTrayIcon, QTextEdit, QVBoxLayout
 
 from animation.clip import PetAction
 from companion.care_panel import CarePanel
+from companion.alarms import AlarmDialog
 from companion.hub import CompanionHub
 from companion.memory import CompanionStore
 from companion.voicepack import VoicePackService
@@ -27,14 +30,23 @@ class CompanionPetWindow(PetWindow):
         self.speech = None
         self.hub = None
         self.care_panel = None
+        self.alarm_dialog = None
         self._closed_companion = False
         self._focus_end = 0.0
         self._focus_minutes = 0
         self._focus_previous_mode = None
         self._manual_voice_at = 0.0
+        self._next_ambient_voice_at = time.monotonic() + 90.0
         super().__init__(paths, config, recovery_status=recovery_status)
         self.setWindowTitle("大肥鱼 · 桌面陪伴")
         self.companion_store = CompanionStore(paths.data_dir)
+        self.alarm_dialog = AlarmDialog()
+        self.alarm_dialog.setWindowIcon(QIcon(str(paths.sprite_dir / "icon.png")))
+        self.alarm_dialog.snooze_requested.connect(self._snooze_alarms)
+        self.alarm_dialog.acknowledged.connect(self._acknowledge_alarms)
+        self.alarm_chime = QSoundEffect(self)
+        self.alarm_chime.setSource(QUrl.fromLocalFile(str(paths.assets_dir / "chimes" / "reminder.wav")))
+        self.alarm_chime.setVolume(0.45)
         self.voice_library = VoicePackLibrary(paths.data_dir)
         self.speech = VoicePackService(paths.assets_dir / "voicepack", self, library=self.voice_library)
         self.hub = CompanionHub(self.companion_store, self.speech, assets_dir=paths.assets_dir)
@@ -53,6 +65,7 @@ class CompanionPetWindow(PetWindow):
         self.care_panel.voice_toggled.connect(self.set_character_voice)
         self.care_panel.preview_requested.connect(self.preview_voice)
         self.care_panel.voice_settings_requested.connect(lambda: self.open_hub("settings"))
+        self.care_panel.alarms_requested.connect(lambda: self.open_hub("alarms"))
         self.apply_companion_settings()
         self.hub.refresh()
         self.companion_store.record_interaction("visit")
@@ -77,6 +90,7 @@ class CompanionPetWindow(PetWindow):
         menu.addAction("外观设置", self._open_control_panel_from_tray)
         menu.addAction("恢复鼠标互动", lambda: self.set_passthrough(False))
         menu.addAction("记忆小本与设置", self.open_hub)
+        menu.addAction("闹钟提醒", lambda: self.open_hub("alarms"))
         menu.addAction("试听角色声音", self.preview_voice)
         menu.addSeparator()
         menu.addAction("退出并保存", self.quit_app)
@@ -176,6 +190,10 @@ class CompanionPetWindow(PetWindow):
         if self.speech is None:
             return
         settings = self.companion_store.snapshot()["settings"]
+        if not settings.get("alarms_enabled", True):
+            if self.alarm_dialog is not None:
+                self.alarm_dialog.dismiss(acknowledge=False)
+            self.alarm_chime.stop()
         self.speech.configure(
             enabled=bool(settings.get("voice_enabled", False)) and os.environ.get("DAFEIYU_SILENT") != "1",
             voice_id=str(settings.get("voice_id") or "community"),
@@ -288,6 +306,9 @@ class CompanionPetWindow(PetWindow):
     def interact(self, kind, food=""):
         self.show()
         self._hidden_by_fullscreen = False
+        if kind == "say":
+            self.preview_voice()
+            return
         if kind.startswith("ritual:"):
             self._perform_ritual(kind.partition(":")[2])
             return
@@ -309,7 +330,7 @@ class CompanionPetWindow(PetWindow):
             self._request_action(PetAction.HAPPY, reason="diary_play", force=True)
             self._record("play")
             self.say("好耶，陪我玩一小会儿！", preserve_action=True)
-            self._voice_for("cheer", manual=True)
+            self._voice_for("encourage", manual=True)
         elif kind == "sleep":
             if self.speech is not None:
                 self.speech.stop()
@@ -361,13 +382,17 @@ class CompanionPetWindow(PetWindow):
         self._record("play", detail=detail)
         if kind == "thought":
             self.say("那些你让我记住的小事，我有好好收着。", preserve_action=True)
+            self._voice_for("think", manual=True)
         elif kind == "tidy":
             self.say("我把这小块地方擦一擦，你也松松肩膀吧。", preserve_action=True)
+            self._voice_for("work", manual=True)
         else:
             self.say("今天辛苦啦。明天见，我们的相处记录会留在这里。", preserve_action=True)
             self._voice_for("sleep")
 
     def _show_startup_recovery_line(self):
+        if self._closed_companion:
+            return
         if self.companion_store is None:
             super()._show_startup_recovery_line()
             return
@@ -428,7 +453,8 @@ class CompanionPetWindow(PetWindow):
             else:
                 self._update_focus_status()
         try:
-            reminders = self.companion_store.due_reminders()
+            reminders = (self.companion_store.due_reminders()
+                         if self.companion_store.snapshot()["settings"].get("alarms_enabled", True) else [])
         except Exception:
             logging.getLogger(__name__).exception("Could not load local reminders")
             self.companion_timer.stop()
@@ -437,7 +463,55 @@ class CompanionPetWindow(PetWindow):
         for reminder in reminders:
             self.say(f"约好的小提醒：{reminder['text']}")
             self.tray.showMessage("大肥鱼提醒你", reminder["text"], QSystemTrayIcon.MessageIcon.Information, 7000)
-            self._voice_for(("click", "idle"))
+        if reminders:
+            self.alarm_dialog.enqueue(reminders)
+            settings = self.companion_store.snapshot()["settings"]
+            if (settings.get("alarm_sound_enabled", True) and not self._quiet_now()
+                    and os.environ.get("DAFEIYU_SILENT") != "1"):
+                self.alarm_chime.play()
+            if self.hub.isVisible():
+                self.hub.refresh()
+        else:
+            self._ambient_voice_tick()
+
+    def _ambient_voice_tick(self):
+        now = time.monotonic()
+        if now < self._next_ambient_voice_at:
+            return
+        # Automatic speech stays opt-in, sparse, and quiet during sleep/focus.
+        self._next_ambient_voice_at = now + random.uniform(90.0, 180.0)
+        if (not self.speech.enabled or not self.speech.automatic or self._focus_end
+                or self._quiet_now() or not self.isVisible() or self.interaction.active
+                or self.action_machine.current not in {PetAction.IDLE, PetAction.WALKING, PetAction.THINKING}
+                or any(panel is not None and panel.isVisible()
+                       for panel in (self.care_panel, self.control_panel, self.food_panel, self.hub, self.alarm_dialog))):
+            return
+        self._voice_for(random.choice(("idle", "idle", "lore", "think", "sing")))
+
+    def _snooze_alarms(self, reminders):
+        if not reminders:
+            return
+        try:
+            # A snooze is a separate one-shot alarm, preserving recurring times.
+            self.companion_store.snooze_reminders(reminders, minutes=5)
+        except Exception:
+            logging.getLogger(__name__).exception("Could not snooze alarms")
+            self.alarm_dialog.status.setText("稍后提醒暂时没存好，请重试。")
+            return
+        self.alarm_dialog.dismiss()
+        self.hub.refresh()
+
+    def _acknowledge_alarms(self, reminders):
+        if self._closed_companion:
+            return
+        for reminder in reminders:
+            if reminder.get("repeat", "once") == "once":
+                try:
+                    self.companion_store.complete_reminder(reminder["id"])
+                except Exception:
+                    logging.getLogger(__name__).exception("Could not mark a delivered alarm complete")
+        if self.hub is not None:
+            self.hub.refresh()
 
     def shutdown_companion(self):
         if self._closed_companion:
@@ -462,4 +536,8 @@ class CompanionPetWindow(PetWindow):
                     self.hub.hide()
                 if self.care_panel is not None:
                     self.care_panel.hide()
+                if self.alarm_dialog is not None:
+                    self.alarm_dialog.dismiss(acknowledge=False)
+                if hasattr(self, "alarm_chime"):
+                    self.alarm_chime.stop()
 

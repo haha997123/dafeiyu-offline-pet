@@ -91,6 +91,7 @@ class CompanionHub(QWidget):
         self._voice_signature = None
         self._voice_id = ""
         self._focus_running = False
+        self._editing_reminder_id = None
         self._voice_save_timer = QTimer(self)
         self._voice_save_timer.setSingleShot(True)
         self._voice_save_timer.setInterval(250)
@@ -188,7 +189,7 @@ class CompanionHub(QWidget):
         side.addWidget(self._label("相处日记", "Muted"))
         side.addSpacing(26)
         self.stack = QStackedWidget()
-        for name, label in (("home", "今天一起"), ("memory", "我们的记忆"), ("growth", "慢慢长大"), ("settings", "习惯与设置")):
+        for name, label in (("home", "今天一起"), ("alarms", "闹钟提醒"), ("memory", "我们的记忆"), ("growth", "慢慢长大"), ("settings", "习惯与设置")):
             button = self._button(label, lambda checked=False, n=name: self.show_page(n), "Nav")
             button.setCheckable(True)
             self._nav[name] = button
@@ -200,6 +201,7 @@ class CompanionHub(QWidget):
         shell.addWidget(sidebar)
         shell.addWidget(self.stack, 1)
         self._build_home()
+        self._build_alarms()
         self._build_memory()
         self._build_growth()
         self._build_settings()
@@ -269,22 +271,96 @@ class CompanionHub(QWidget):
         box.addLayout(focus_row)
         content.addWidget(focus)
 
-        reminder, box = self._card("留一个小提醒")
+        reminder, box = self._card("闹钟提醒")
+        self.home_alarm_summary = self._label("还没有设置闹钟。", "Muted")
+        box.addWidget(self.home_alarm_summary)
+        button = self._button("设置闹钟", lambda: self.show_page("alarms"))
+        button.setObjectName("openAlarms")
+        box.addWidget(button)
+        content.addWidget(reminder)
+        content.addStretch()
+
+    def _build_alarms(self):
+        content = self._page("alarms", "约好时间，提醒你", "一次、每天或工作日的小约定，都保存在这台电脑。")
+        delivery, box = self._card()
+        self.alarms_enabled = QCheckBox("启用闹钟提醒")
+        self.alarms_enabled.setObjectName("alarmsEnabled")
+        self.alarms_enabled.setStyleSheet("font-size:16px;font-weight:600;color:#294064;")
+        self.alarms_enabled.setToolTip("关闭后不弹窗、不响铃，但可以继续保存和编辑闹钟。重新开启后，每个过期闹钟最多补提醒一次。")
+        self.alarms_enabled.setToolTipDuration(20000)
+        self.alarms_enabled.toggled.connect(self._save_alarms_enabled)
+        box.addWidget(self.alarms_enabled)
+        self.alarms_delivery_status = self._label("", "Muted")
+        box.addWidget(self.alarms_delivery_status)
+        content.addWidget(delivery)
+        editor, box = self._card("设置一个闹钟")
+        self.alarm_edit_status = self._label("新闹钟", "Muted")
+        box.addWidget(self.alarm_edit_status)
         self.reminder_text = QLineEdit()
         self.reminder_text.setPlaceholderText("比如：今晚记得喝水")
+        self.reminder_text.setObjectName("alarmText")
         self.reminder_text.setMaxLength(200)
         box.addWidget(self.reminder_text)
         reminder_row = QHBoxLayout()
         self.reminder_due = QDateTimeEdit(QDateTime.currentDateTime().addSecs(3600))
-        self.reminder_due.setDisplayFormat("MM月dd日 HH:mm")
+        self.reminder_due.setObjectName("alarmDue")
+        self.reminder_due.setDisplayFormat("yyyy年MM月dd日 HH:mm")
         self.reminder_due.setCalendarPopup(True)
+        self.reminder_due.setToolTip("选择第一次提醒的日期和时分。每天沿用这个时分；工作日选到周末时会顺延到周一。")
+        self.reminder_due.setToolTipDuration(20000)
         reminder_row.addWidget(self.reminder_due, 1)
-        reminder_row.addWidget(self._button("记下提醒", self._add_reminder))
+        self.reminder_repeat = QComboBox()
+        self.reminder_repeat.setObjectName("alarmRepeat")
+        for label, value in (("只提醒一次", "once"), ("每天", "daily"), ("工作日", "weekdays")):
+            self.reminder_repeat.addItem(label, value)
+        self.reminder_repeat.setToolTip("每天按所选时分重复；工作日指周一到周五，不包含节假日调休判断。错过多天只补一次，随后排到下一次。")
+        self.reminder_repeat.setToolTipDuration(20000)
+        reminder_row.addWidget(self.reminder_repeat)
         box.addLayout(reminder_row)
-        self.reminders_layout = QVBoxLayout()
-        self.reminders_layout.setSpacing(7)
-        box.addLayout(self.reminders_layout)
-        content.addWidget(reminder)
+        buttons = QHBoxLayout()
+        self.alarm_cancel_button = self._button("取消编辑", self._cancel_alarm_edit)
+        self.alarm_cancel_button.setObjectName("alarmCancelEdit")
+        self.alarm_cancel_button.hide()
+        buttons.addWidget(self.alarm_cancel_button)
+        buttons.addStretch()
+        self.alarm_save_button = self._button("添加闹钟", self._add_reminder, "Primary")
+        self.alarm_save_button.setObjectName("alarmSave")
+        buttons.addWidget(self.alarm_save_button)
+        box.addLayout(buttons)
+        self.alarm_sound_enabled = QCheckBox("播放闹钟提示音")
+        self.alarm_sound_enabled.setObjectName("alarmSoundEnabled")
+        self.alarm_sound_enabled.setToolTip("使用简短的离线提示音，独立于角色语音开关。关闭后仍会显示提醒；夜间安静时段也不播放。")
+        self.alarm_sound_enabled.setToolTipDuration(20000)
+        self.alarm_sound_enabled.toggled.connect(self._save_alarm_sound)
+        box.addWidget(self.alarm_sound_enabled)
+        box.addWidget(self._label("程序运行时会提醒。关闭程序或电脑睡眠时无法准点响铃；重新打开或唤醒后，错过的每个闹钟只补提醒一次。重复闹钟随后继续下一次，不会逐日补发。", "Muted"))
+        content.addWidget(editor)
+
+        alarms, box = self._card("已经约好的时间")
+        self.alarm_list = QListWidget()
+        self.alarm_list.setObjectName("alarmList")
+        self.alarm_list.setWordWrap(True)
+        self.alarm_list.setMinimumHeight(175)
+        self.alarm_list.itemDoubleClicked.connect(lambda *_: self._edit_selected_alarm())
+        self.alarm_list.currentItemChanged.connect(lambda *_: self._update_alarm_actions())
+        box.addWidget(self.alarm_list)
+        actions = QHBoxLayout()
+        self.alarm_edit_button = self._button("编辑", self._edit_selected_alarm)
+        self.alarm_edit_button.setObjectName("alarmEdit")
+        self.alarm_complete_button = self._button("完成 / 停止重复", self._complete_selected_alarm)
+        self.alarm_complete_button.setObjectName("alarmComplete")
+        self.alarm_complete_button.setToolTip("一次闹钟标为完成；重复闹钟停止后续提醒。需要重新启用时，可以编辑并保存。")
+        self.alarm_complete_button.setToolTipDuration(20000)
+        self.alarm_delete_button = self._button("删除", self._delete_selected_alarm)
+        self.alarm_delete_button.setObjectName("alarmDelete")
+        self.alarm_delete_button.setToolTip("删除所选闹钟。日记里已经发生的提醒记录仍会保留。")
+        self.alarm_delete_button.setToolTipDuration(20000)
+        for button in (self.alarm_edit_button, self.alarm_complete_button, self.alarm_delete_button):
+            actions.addWidget(button)
+        box.addLayout(actions)
+        self.alarm_list_status = self._label("", "Muted")
+        box.addWidget(self.alarm_list_status)
+        content.addWidget(alarms)
         content.addStretch()
 
     def _build_memory(self):
@@ -412,7 +488,9 @@ class CompanionHub(QWidget):
         content = self._page("settings", "按你的习惯相处", "语音、记忆和备份，都由你决定。")
         voice, box = self._card("听见她的声音")
         self.voice_enabled = QCheckBox("开启离线语音")
-        self.voice_auto = QCheckBox("互动时自动播放语音")
+        self.voice_auto = QCheckBox("平时也说话（自动播放）")
+        self.voice_auto.setToolTip("开启后，互动和空闲时可自动播放角色台词；空闲约每 1.5～3 分钟尝试一次。睡眠、专注、夜间和面板打开时暂停。")
+        self.voice_auto.setToolTipDuration(20000)
         self.voice_enabled.setObjectName("voiceEnabled")
         self.voice_auto.setObjectName("voiceAutomatic")
         box.addWidget(self.voice_enabled)
@@ -683,27 +761,129 @@ class CompanionHub(QWidget):
             self.reminder_text.setFocus()
             return
         try:
-            due = self.reminder_due.dateTime().toPython().astimezone().isoformat(timespec="seconds")
-            self.store.add_reminder(text, due)
-            self.reminder_text.clear()
+            due = self.reminder_due.dateTime().toPython().astimezone().replace(second=0, microsecond=0).isoformat(timespec="seconds")
+            repeat = self.reminder_repeat.currentData()
+            if self._editing_reminder_id is None:
+                self.store.add_reminder(text, due, repeat)
+            else:
+                self.store.update_reminder(self._editing_reminder_id, text, due, repeat)
+            self._cancel_alarm_edit()
             self.refresh()
         except Exception as exc:
             self._error("暂时没有记下提醒", exc)
 
     def _render_reminders(self):
-        self._clear_layout(self.reminders_layout)
-        pending = [r for r in self._snapshot.get("reminders", []) if not r.get("done")]
-        if not pending:
-            self.reminders_layout.addWidget(self._label("暂时没有待办提醒。", "Muted"))
-        for reminder in pending[:12]:
-            row = QHBoxLayout()
-            row.addWidget(self._label(f"{_when(reminder.get('due_at'))}  {_text(reminder.get('text'))}"), 1)
-            row.addWidget(self._button("完成", lambda checked=False, i=reminder.get("id"): self._complete_reminder(i)))
-            self.reminders_layout.addLayout(row)
+        current = self.alarm_list.currentItem()
+        selected = current.data(Qt.ItemDataRole.UserRole) if current else None
+        self.alarm_list.clear()
+        reminders = self._snapshot.get("reminders", [])
+        pending = [r for r in reminders if not r.get("done")]
+        alarms_enabled = bool(self._snapshot.get("settings", {}).get("alarms_enabled", True))
+        self.home_alarm_summary.setText((f"还有 {len(pending)} 个闹钟在等约好的时间。" if pending else "还没有待提醒的闹钟，可以设置一次或重复提醒。") if alarms_enabled else "闹钟提醒已关闭；已保存的闹钟保留，可以随时重新开启。")
+        repeat_names = {"once": "一次", "daily": "每天", "weekdays": "工作日"}
+        for reminder in reminders:
+            state = "已停止 / 完成" if reminder.get("done") else "待提醒"
+            text = f"{_when(reminder.get('due_at'))} · {repeat_names.get(reminder.get('repeat', 'once'), '一次')} · {state}\n{_text(reminder.get('text'))}"
+            item = QListWidgetItem(text)
+            item.setData(Qt.ItemDataRole.UserRole, reminder.get("id"))
+            self.alarm_list.addItem(item)
+            if reminder.get("id") == selected:
+                self.alarm_list.setCurrentItem(item)
+        if not reminders:
+            item = QListWidgetItem("暂时没有闹钟，写下第一件想让她提醒的事吧。")
+            item.setFlags(Qt.ItemFlag.NoItemFlags)
+            self.alarm_list.addItem(item)
+        blocker = QSignalBlocker(self.alarm_sound_enabled)
+        self.alarm_sound_enabled.setChecked(bool(self._snapshot.get("settings", {}).get("alarm_sound_enabled", True)))
+        del blocker
+        blocker = QSignalBlocker(self.alarms_enabled)
+        self.alarms_enabled.setChecked(alarms_enabled)
+        del blocker
+        self.alarms_delivery_status.setText("已启用。程序运行时到期提醒；关闭程序或睡眠期间无法准点送达。" if alarms_enabled else "已关闭：不弹窗、不响铃。仍可保存和编辑闹钟；重新开启后，每个过期闹钟最多补提醒一次。")
+        self.alarm_list_status.setText(f"{len(pending)} 个启用 · 共 {len(reminders)} 个闹钟。选中后可编辑、完成或删除。")
+        self._update_alarm_actions()
+
+    def _update_alarm_actions(self):
+        selected = self.alarm_list.currentItem()
+        reminder_id = selected.data(Qt.ItemDataRole.UserRole) if selected else None
+        for button in (self.alarm_edit_button, self.alarm_delete_button):
+            button.setEnabled(reminder_id is not None)
+        active = any(r.get("id") == reminder_id and not r.get("done") for r in self._snapshot.get("reminders", []))
+        self.alarm_complete_button.setEnabled(active)
+
+    def _edit_selected_alarm(self):
+        item = self.alarm_list.currentItem()
+        if not item:
+            return
+        reminder_id = item.data(Qt.ItemDataRole.UserRole)
+        reminder = next((r for r in self._snapshot.get("reminders", []) if r.get("id") == reminder_id), None)
+        if not reminder:
+            return
+        self._editing_reminder_id = reminder_id
+        self.reminder_text.setText(_text(reminder["text"]))
+        due = datetime.fromisoformat(reminder["due_at"].replace("Z", "+00:00")).astimezone()
+        self.reminder_due.setDateTime(QDateTime(due))
+        self.reminder_repeat.setCurrentIndex(max(0, self.reminder_repeat.findData(reminder.get("repeat", "once"))))
+        self.alarm_edit_status.setText("正在编辑闹钟；保存后会重新启用这项提醒。")
+        self.alarm_save_button.setText("保存修改")
+        self.alarm_cancel_button.show()
+        self.reminder_text.setFocus()
+
+    def _cancel_alarm_edit(self):
+        self._editing_reminder_id = None
+        self.reminder_text.clear()
+        self.reminder_due.setDateTime(QDateTime.currentDateTime().addSecs(3600))
+        self.reminder_repeat.setCurrentIndex(0)
+        self.alarm_edit_status.setText("新闹钟")
+        self.alarm_save_button.setText("添加闹钟")
+        self.alarm_cancel_button.hide()
+
+    def _complete_selected_alarm(self):
+        item = self.alarm_list.currentItem()
+        if item and item.data(Qt.ItemDataRole.UserRole) is not None:
+            self._complete_reminder(item.data(Qt.ItemDataRole.UserRole))
+
+    def _delete_selected_alarm(self):
+        item = self.alarm_list.currentItem()
+        if not item or item.data(Qt.ItemDataRole.UserRole) is None:
+            return
+        reminder_id = item.data(Qt.ItemDataRole.UserRole)
+        try:
+            self.store.delete_reminder(reminder_id)
+            if self._editing_reminder_id == reminder_id:
+                self._cancel_alarm_edit()
+            self.refresh()
+        except Exception as exc:
+            self._error("暂时没有删除闹钟", exc)
+
+    def _save_alarm_sound(self, enabled: bool):
+        try:
+            self.store.set_setting("alarm_sound_enabled", bool(enabled))
+            self._snapshot.setdefault("settings", {})["alarm_sound_enabled"] = bool(enabled)
+            self.settings_changed.emit()
+        except Exception as exc:
+            blocker = QSignalBlocker(self.alarm_sound_enabled)
+            self.alarm_sound_enabled.setChecked(bool(self._snapshot.get("settings", {}).get("alarm_sound_enabled", True)))
+            del blocker
+            self._error("暂时没有保存闹钟声音设置", exc)
+
+    def _save_alarms_enabled(self, enabled: bool):
+        try:
+            self.store.set_setting("alarms_enabled", bool(enabled))
+            self._snapshot.setdefault("settings", {})["alarms_enabled"] = bool(enabled)
+            self._render_reminders()
+            self.settings_changed.emit()
+        except Exception as exc:
+            blocker = QSignalBlocker(self.alarms_enabled)
+            self.alarms_enabled.setChecked(bool(self._snapshot.get("settings", {}).get("alarms_enabled", True)))
+            del blocker
+            self._error("暂时没有保存闹钟总开关", exc)
 
     def _complete_reminder(self, reminder_id):
         try:
             self.store.complete_reminder(reminder_id)
+            if self._editing_reminder_id == reminder_id:
+                self._cancel_alarm_edit()
             self.refresh()
         except Exception as exc:
             self._error("暂时没有更新提醒", exc)

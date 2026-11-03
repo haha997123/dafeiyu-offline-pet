@@ -21,6 +21,8 @@ class VoicePackService(QObject):
         self.library = library
         self._packs = {}
         self._builtin_clips = []
+        self._all_builtin_clips = []
+        self._rotation_bags = {}
         self.enabled = False
         self.automatic = False
         self.volume = 75
@@ -45,7 +47,7 @@ class VoicePackService(QObject):
             if not isinstance(clips, list):
                 raise ValueError("语音包清单格式错误")
             for clip in clips:
-                if not isinstance(clip, dict) or not clip.get("enabled_default", False):
+                if not isinstance(clip, dict):
                     continue
                 path = (self.pack_dir / str(clip.get("playback_file") or clip.get("file", ""))).resolve()
                 if not path.is_relative_to(self.pack_dir) or not path.is_file():
@@ -54,16 +56,22 @@ class VoicePackService(QObject):
                     continue
                 if not all(isinstance(clip.get(key), str) and clip[key] for key in ("id", "category", "text")):
                     continue
-                self._builtin_clips.append({**clip, "path": path, "caption_known": True})
+                item = {**clip, "path": path, "caption_known": True}
+                self._all_builtin_clips.append(item)
+                if clip.get("enabled_default", False):
+                    self._builtin_clips.append(item)
             if not self._builtin_clips:
                 raise ValueError("没有找到可播放的默认角色语音")
         except (OSError, ValueError, TypeError) as error:
             self.error = f"角色语音包不可用：{error}"
 
     def refresh_packs(self):
+        previous = (self.voice_id, tuple((clip["id"], clip["path"]) for clip in self._clips))
         packs = {}
         if self._builtin_clips:
-            packs["community"] = {"id": "community", "name": "大肥鱼 · 社区角色原声", "clips": self._builtin_clips}
+            packs["community"] = {"id": "community", "name": f"大肥鱼 · 温柔日常 {len(self._builtin_clips)} 句", "clips": self._builtin_clips}
+        if self._all_builtin_clips:
+            packs["community-full"] = {"id": "community-full", "name": f"社区原声 · 完整 {len(self._all_builtin_clips)} 句（含亲昵称呼）", "clips": self._all_builtin_clips}
         if self.library is not None:
             try:
                 for pack in self.library.list_packs():
@@ -77,12 +85,17 @@ class VoicePackService(QObject):
             self.voice_id = "community" if "community" in packs else next(iter(packs), "")
         self._clips = packs.get(self.voice_id, {}).get("clips", [])
         self.available = bool(self._clips)
+        current = (self.voice_id, tuple((clip["id"], clip["path"]) for clip in self._clips))
+        if current != previous:
+            self.stop()
+            self._reset_rotation()
 
     def configure(self, enabled, voice_id="", rate=0, volume=75, automatic=False):
         self.enabled = bool(enabled)
         chosen = voice_id if voice_id in self._packs else "community"
         if chosen != self.voice_id:
             self.stop()
+            self._reset_rotation()
         self.voice_id = chosen
         self._clips = self._packs.get(self.voice_id, {}).get("clips", [])
         self.available = bool(self._clips)
@@ -141,23 +154,38 @@ class VoicePackService(QObject):
             self._last_manual_at = time.monotonic()
         return clip["text"] if clip.get("caption_known", True) else "（播放导入的语音片段）"
 
+    def _reset_rotation(self):
+        self._rotation_bags.clear()
+        self._last_id = ""
+
     def play(self, category: str, *, automatic=False):
         preferred = {
-            "preview": ("click4",),
-            "pat": ("click4", "click2"),
-            "thanks": ("click2",),
+            "pat": ("click4", "click2", "idle6", "love1"),
+            "thanks": ("click2", "click4"),
+            "work": ("think1", "idle3", "click3", "click4"),
+            "encourage": ("cheer1", "click4", "idle3"),
         }.get(category)
-        candidates = [clip for clip in self._clips if clip["category"] == category]
+        candidates = self._clips[:] if category == "preview" else [clip for clip in self._clips if clip["category"] == category]
         if not candidates and preferred:
             candidates = [clip for clip in self._clips if clip["id"] in preferred]
-        if not candidates and category == "preview":
-            candidates = self._clips[:1]
         if not candidates:
             candidates = [clip for clip in self._clips if clip["category"] == "general"]
         if not candidates:
             return None
-        fresh = [clip for clip in candidates if clip["id"] != self._last_id]
-        return self._play_clip(random.choice(fresh or candidates), automatic=automatic)
+        if not self._allowed(automatic):
+            return None
+        # A shuffled deck makes every line in this scene available before any
+        # repeats. Failed playback gates must not silently spend a line.
+        key = (self.voice_id, category, tuple(clip["id"] for clip in candidates))
+        bag = self._rotation_bags.get(key)
+        if not bag:
+            bag = candidates[:]
+            random.shuffle(bag)
+        index = 1 if len(bag) > 1 and bag[0]["id"] == self._last_id else 0
+        result = self._play_clip(bag[index], automatic=automatic)
+        if result:
+            self._rotation_bags[key] = bag[:index] + bag[index + 1:]
+        return result
 
     def speak(self, text: str, *, automatic=False):
         # This API also serves the settings preview. Arbitrary journal text is

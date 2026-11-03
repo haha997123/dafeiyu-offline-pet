@@ -23,6 +23,7 @@ ROOT = Path(__file__).resolve().parents[1]
 OUTPUT_NAME = "大肥鱼-离线养成版"
 PINNED = {"PySide6": "6.8.3", "Pillow": "11.3.0", "psutil": "7.2.2", "PyInstaller": "6.22.3"}
 RUNTIME_DIRS = {
+    "assets/chimes": {".wav"},
     "assets/community": {".json", ".md", ".webp"},
     "assets/dialogue": {".json"},
     "assets/voicepack": {".json", ".md", ".mp3", ".wav", ".ogg"},

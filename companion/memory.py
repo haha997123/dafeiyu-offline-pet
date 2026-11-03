@@ -9,12 +9,12 @@ import tempfile
 import threading
 import uuid
 from contextlib import contextmanager
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Any, Callable, Iterator
 
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 3
 BACKUP_FORMAT = "dafeiyu-companion-backup"
 PROFILE_DEFAULTS = {
     "owner_name": "",
@@ -32,6 +32,8 @@ SETTING_DEFAULTS = {
     "voice_volume": 75,
     "quiet_start": 23,
     "quiet_end": 8,
+    "alarm_sound_enabled": True,
+    "alarms_enabled": True,
 }
 DAILY_POINT_LIMIT = 60
 # Both the points and calendar-day requirements must be met. The eighth level
@@ -111,7 +113,7 @@ def _validate_profile(value: Any) -> dict[str, str]:
 def _validate_setting(key: str, value: Any) -> Any:
     if key not in SETTING_DEFAULTS:
         raise ValueError(f"未知设置：{key}")
-    if key in {"voice_enabled", "voice_auto"}:
+    if key in {"voice_enabled", "voice_auto", "alarm_sound_enabled", "alarms_enabled"}:
         if type(value) is not bool:
             raise ValueError(f"{key}必须是开关值")
     elif key == "voice_id":
@@ -155,7 +157,7 @@ class CompanionStore:
             self._db.execute("PRAGMA foreign_keys = ON")
             self._db.execute("PRAGMA busy_timeout = 15000")
             version = self._db.execute("PRAGMA user_version").fetchone()[0]
-            if version not in {0, SCHEMA_VERSION}:
+            if version not in {0, 1, 2, SCHEMA_VERSION}:
                 raise ValueError(f"记忆数据库版本 {version} 暂不支持，请使用相应版本的程序")
             if version == 0:
                 existing = self._db.execute(
@@ -164,6 +166,19 @@ class CompanionStore:
                 if existing:
                     raise ValueError("已有数据库缺少受支持的版本标记，未修改原数据")
                 self._create_schema()
+            elif version in {1, 2}:
+                # Validate the old store before changing its schema. Migration
+                # and the new setting are committed together, never piecemeal.
+                self._check_schema(legacy=version == 1)
+                self._profile()
+                self._settings(version=version)
+                _datetime(self._created_at(), "建立时间")
+                with self._transaction():
+                    if version == 1:
+                        self._db.execute("ALTER TABLE reminders ADD COLUMN repeat TEXT NOT NULL DEFAULT 'once' CHECK(repeat IN ('once','daily','weekdays'))")
+                        self._db.execute("INSERT INTO settings VALUES ('alarm_sound_enabled', 'true')")
+                    self._db.execute("INSERT INTO settings VALUES ('alarms_enabled', 'true')")
+                    self._db.execute("PRAGMA user_version = 3")
             self._check_schema()
             self._profile()
             self._settings()
@@ -216,12 +231,13 @@ class CompanionStore:
             """CREATE TABLE reminders (
                 id INTEGER PRIMARY KEY AUTOINCREMENT, text TEXT NOT NULL,
                 due_at TEXT NOT NULL, done INTEGER NOT NULL DEFAULT 0 CHECK(done IN (0,1)),
-                notified_at TEXT)""",
+                notified_at TEXT,
+                repeat TEXT NOT NULL DEFAULT 'once' CHECK(repeat IN ('once','daily','weekdays')))""",
         )
         with self._transaction():
             for statement in statements:
                 self._db.execute(statement)
-            self._db.execute("PRAGMA user_version = 1")
+            self._db.execute("PRAGMA user_version = 3")
             self._db.execute("INSERT INTO metadata VALUES ('created_at', ?)", (self._stamp(self._now()),))
             self._db.executemany("INSERT INTO profile VALUES (?,?)", PROFILE_DEFAULTS.items())
             self._db.executemany(
@@ -229,14 +245,14 @@ class CompanionStore:
                 ((key, json.dumps(value, ensure_ascii=False)) for key, value in SETTING_DEFAULTS.items()),
             )
 
-    def _check_schema(self) -> None:
+    def _check_schema(self, *, legacy: bool = False) -> None:
         expected = {
             "metadata": {"key", "value"},
             "profile": {"key", "value"},
             "settings": {"key", "value"},
             "events": {"id", "at", "day", "kind", "title", "detail", "food", "points"},
             "notes": {"id", "at", "text"},
-            "reminders": {"id", "text", "due_at", "done", "notified_at"},
+            "reminders": {"id", "text", "due_at", "done", "notified_at"} | (set() if legacy else {"repeat"}),
         }
         for table, columns in expected.items():
             actual = {row["name"] for row in self._db.execute(f"PRAGMA table_info({table})")}
@@ -254,12 +270,13 @@ class CompanionStore:
     def _profile(self) -> dict:
         return _validate_profile(dict(self._db.execute("SELECT key,value FROM profile")))
 
-    def _settings(self) -> dict:
+    def _settings(self, *, version: int = SCHEMA_VERSION) -> dict:
         try:
             result = {row[0]: json.loads(row[1]) for row in self._db.execute("SELECT key,value FROM settings")}
         except (ValueError, TypeError) as error:
             raise ValueError("记忆数据库的设置损坏") from error
-        _exact_keys(result, set(SETTING_DEFAULTS), "设置")
+        expected = set(SETTING_DEFAULTS) - ({"alarm_sound_enabled"} if version == 1 else set()) - ({"alarms_enabled"} if version < 3 else set())
+        _exact_keys(result, expected, "设置")
         for key, value in result.items():
             _validate_setting(key, value)
         return result
@@ -322,7 +339,7 @@ class CompanionStore:
                 "event_count": self._db.execute("SELECT COUNT(*) FROM events").fetchone()[0],
                 "notes": [dict(row) for row in self._db.execute("SELECT id,at,text FROM notes ORDER BY id DESC")],
                 "reminders": [
-                    {"id": row["id"], "text": row["text"], "due_at": row["due_at"], "done": bool(row["done"])}
+                    self._reminder_view(row)
                     for row in self._db.execute("SELECT * FROM reminders ORDER BY done,id DESC")
                 ],
             }
@@ -432,8 +449,18 @@ class CompanionStore:
                 parts.append("我们的具体相处记录还很少。你可以喂我一点东西，或者写下一件想让我记住的事。")
             return "".join(parts)
 
-    def add_reminder(self, text: str, due_at: datetime | str) -> dict:
-        _text(text, "提醒内容", nonempty=True)
+    @staticmethod
+    def _repeat(value: str) -> str:
+        if not isinstance(value, str) or value not in {"once", "daily", "weekdays"}:
+            raise ValueError("重复方式请选择一次、每天或工作日")
+        return value
+
+    @staticmethod
+    def _reminder_view(row) -> dict:
+        return {"id": row["id"], "text": row["text"], "due_at": row["due_at"], "done": bool(row["done"]), "repeat": row["repeat"]}
+
+    def _reminder_time(self, due_at: datetime | str, repeat: str) -> datetime:
+        self._repeat(repeat)
         if isinstance(due_at, datetime):
             due = due_at.astimezone() if due_at.tzinfo is None else due_at
         else:
@@ -448,11 +475,58 @@ class CompanionStore:
                 raise ValueError("提醒时间必须包含时分")
             if due.tzinfo is None:
                 due = due.replace(tzinfo=self._now().tzinfo)
+        if repeat == "weekdays":
+            while due.weekday() >= 5:
+                due += timedelta(days=1)
+        return due
+
+    def add_reminder(self, text: str, due_at: datetime | str, repeat: str = "once") -> dict:
+        _text(text, "提醒内容", nonempty=True)
+        due = self._reminder_time(due_at, repeat)
         due_string = self._stamp(due)
         with self._transaction():
-            cursor = self._db.execute("INSERT INTO reminders(text,due_at) VALUES (?,?)", (text, due_string))
+            cursor = self._db.execute("INSERT INTO reminders(text,due_at,repeat) VALUES (?,?,?)", (text.strip(), due_string, repeat))
             self._add_event(self._now(), "reminder", "记下一项提醒", f"{text}（{due_string}）")
-            return {"id": int(cursor.lastrowid), "text": text, "due_at": due_string, "done": False}
+            return {"id": int(cursor.lastrowid), "text": text.strip(), "due_at": due_string, "done": False, "repeat": repeat}
+
+    def update_reminder(self, reminder_id: int, text: str, due_at: datetime | str, repeat: str = "once") -> dict:
+        _integer(reminder_id, "提醒编号", 1)
+        _text(text, "提醒内容", nonempty=True)
+        due = self._stamp(self._reminder_time(due_at, repeat))
+        with self._transaction():
+            if self._db.execute("SELECT id FROM reminders WHERE id=?", (reminder_id,)).fetchone() is None:
+                raise ValueError("找不到这项提醒")
+            self._db.execute("UPDATE reminders SET text=?,due_at=?,repeat=?,done=0,notified_at=NULL WHERE id=?", (text.strip(), due, repeat, reminder_id))
+            self._add_event(self._now(), "reminder", "修改一项闹钟", f"{text}（{due}）")
+        return {"id": reminder_id, "text": text.strip(), "due_at": due, "done": False, "repeat": repeat}
+
+    def snooze_reminders(self, reminders: list, minutes: int = 5) -> list:
+        _integer(minutes, "稍后提醒分钟数", 1, 1440)
+        if not isinstance(reminders, list):
+            raise ValueError("稍后提醒必须是闹钟列表")
+        texts = []
+        for item in reminders:
+            if not isinstance(item, dict):
+                raise ValueError("稍后提醒内容无效")
+            texts.append(_text(item.get("text"), "提醒内容", nonempty=True).strip())
+        now = self._now()
+        due = self._stamp(now + timedelta(minutes=minutes))
+        added = []
+        with self._transaction():
+            for text in texts:
+                cursor = self._db.execute("INSERT INTO reminders(text,due_at,repeat) VALUES (?,?,'once')", (text, due))
+                self._add_event(now, "reminder", "稍后再提醒", f"{text}（{minutes} 分钟后）")
+                added.append({"id": int(cursor.lastrowid), "text": text, "due_at": due, "done": False, "repeat": "once"})
+        return added
+
+    def delete_reminder(self, reminder_id: int) -> None:
+        _integer(reminder_id, "提醒编号", 1)
+        with self._transaction():
+            row = self._db.execute("SELECT text FROM reminders WHERE id=?", (reminder_id,)).fetchone()
+            if row is None:
+                raise ValueError("找不到这项提醒")
+            self._db.execute("DELETE FROM reminders WHERE id=?", (reminder_id,))
+            self._add_event(self._now(), "reminder", "删除一项闹钟", row["text"])
 
     def complete_reminder(self, reminder_id: int) -> None:
         _integer(reminder_id, "提醒编号", 1)
@@ -467,12 +541,25 @@ class CompanionStore:
     def due_reminders(self) -> list:
         now = self._now()
         with self._transaction():
+            if not self._settings()["alarms_enabled"]:
+                return []
             due = []
-            for row in self._db.execute("SELECT * FROM reminders WHERE done=0 AND notified_at IS NULL ORDER BY id"):
+            for row in self._db.execute("SELECT * FROM reminders WHERE done=0 AND (notified_at IS NULL OR repeat<>'once') ORDER BY due_at,id"):
                 if _datetime(row["due_at"], "提醒时间") <= now:
-                    due.append({"id": row["id"], "text": row["text"], "due_at": row["due_at"], "done": False})
+                    due.append(self._reminder_view(row))
             for item in due:
-                self._db.execute("UPDATE reminders SET notified_at=? WHERE id=?", (self._stamp(now), item["id"]))
+                if item["repeat"] == "once":
+                    self._db.execute("UPDATE reminders SET notified_at=? WHERE id=?", (self._stamp(now), item["id"]))
+                else:
+                    previous = _datetime(item["due_at"], "提醒时间")
+                    local_now = now.astimezone(previous.tzinfo)
+                    following = local_now.replace(hour=previous.hour, minute=previous.minute, second=previous.second, microsecond=previous.microsecond)
+                    if following <= local_now:
+                        following += timedelta(days=1)
+                    if item["repeat"] == "weekdays":
+                        while following.weekday() >= 5:
+                            following += timedelta(days=1)
+                    self._db.execute("UPDATE reminders SET notified_at=?,due_at=? WHERE id=?", (self._stamp(now), self._stamp(following), item["id"]))
                 self._add_event(now, "reminder_due", "到提醒时间啦", item["text"])
             return due
 
@@ -519,19 +606,21 @@ class CompanionStore:
     @staticmethod
     def _validate_backup(payload: Any) -> dict:
         _exact_keys(payload, {"format", "version", "created_at", "exported_at", "profile", "settings", "events", "notes", "reminders"}, "备份")
-        if payload["format"] != BACKUP_FORMAT or type(payload["version"]) is not int or payload["version"] != SCHEMA_VERSION:
+        if payload["format"] != BACKUP_FORMAT or type(payload["version"]) is not int or payload["version"] not in {1, 2, SCHEMA_VERSION}:
             raise ValueError("备份格式或版本不受支持")
+        legacy = payload["version"] == 1
         _datetime(payload["created_at"], "建立时间")
         _datetime(payload["exported_at"], "导出时间")
         _validate_profile(payload["profile"])
-        _exact_keys(payload["settings"], set(SETTING_DEFAULTS), "设置")
+        expected_settings = set(SETTING_DEFAULTS) - ({"alarm_sound_enabled"} if legacy else set()) - ({"alarms_enabled"} if payload["version"] < 3 else set())
+        _exact_keys(payload["settings"], expected_settings, "设置")
         for key, value in payload["settings"].items():
             _validate_setting(key, value)
         daily_points: dict[str, int] = {}
         for collection, keys in (
             ("events", {"id", "at", "day", "kind", "title", "detail", "food", "points"}),
             ("notes", {"id", "at", "text"}),
-            ("reminders", {"id", "text", "due_at", "done", "notified_at"}),
+            ("reminders", {"id", "text", "due_at", "done", "notified_at"} | (set() if legacy else {"repeat"})),
         ):
             rows = payload[collection]
             if not isinstance(rows, list):
@@ -569,6 +658,15 @@ class CompanionStore:
                         raise ValueError("提醒完成状态无效")
                     if row["notified_at"] is not None:
                         _datetime(row["notified_at"], "已提醒时间")
+                    if not legacy:
+                        CompanionStore._repeat(row["repeat"])
+        if legacy:
+            payload["settings"]["alarm_sound_enabled"] = True
+            for row in payload["reminders"]:
+                row["repeat"] = "once"
+        if payload["version"] < 3:
+            payload["settings"]["alarms_enabled"] = True
+            payload["version"] = SCHEMA_VERSION
         return payload
 
     def import_backup(self, path: Path) -> None:
@@ -593,7 +691,7 @@ class CompanionStore:
             )
             self._db.executemany("INSERT INTO notes(id,at,text) VALUES (:id,:at,:text)", payload["notes"])
             self._db.executemany(
-                "INSERT INTO reminders(id,text,due_at,done,notified_at) VALUES (:id,:text,:due_at,:done,:notified_at)", payload["reminders"]
+                "INSERT INTO reminders(id,text,due_at,done,notified_at,repeat) VALUES (:id,:text,:due_at,:done,:notified_at,:repeat)", payload["reminders"]
             )
 
     def close(self) -> None:

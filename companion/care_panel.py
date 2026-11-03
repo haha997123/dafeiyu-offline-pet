@@ -39,6 +39,7 @@ class CarePanel(QWidget):
     voice_toggled = Signal(bool)
     preview_requested = Signal()
     voice_settings_requested = Signal()
+    alarms_requested = Signal()
 
     def __init__(self, parent=None):
         super().__init__(parent, Qt.WindowType.Popup | Qt.WindowType.FramelessWindowHint)
@@ -97,7 +98,7 @@ class CarePanel(QWidget):
         actions = QHBoxLayout()
         actions.setSpacing(8)
         self.action_buttons = {}
-        for label, kind in (("摸摸", "pat"), ("陪玩", "play"), ("睡觉", "sleep")):
+        for label, kind in (("摸摸", "pat"), ("陪玩", "play"), ("睡觉", "sleep"), ("听句台词", "say")):
             button = self._button(label, f"careAction_{kind}")
             button.setProperty("careAction", True)
             button.setFixedHeight(34)
@@ -120,6 +121,10 @@ class CarePanel(QWidget):
         self.appearance_button.setFixedHeight(30)
         self.appearance_button.clicked.connect(self._open_appearance)
         links.addWidget(self.journal_button, 1)
+        self.alarms_button = self._button("闹钟提醒", "careAlarms")
+        self.alarms_button.setFixedHeight(30)
+        self.alarms_button.clicked.connect(self._open_alarms)
+        links.addWidget(self.alarms_button, 1)
         links.addWidget(self.appearance_button, 1)
         layout.addLayout(links)
         layout.addSpacing(7)
@@ -189,6 +194,10 @@ class CarePanel(QWidget):
     def _interact(self, kind: str, food: str = ""):
         self.hide()
         self.interaction_requested.emit(kind, food)
+
+    def _open_alarms(self):
+        self.hide()
+        self.alarms_requested.emit()
 
     def _open_journal(self):
         self.hide()

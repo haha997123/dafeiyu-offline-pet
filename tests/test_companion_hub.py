@@ -46,8 +46,16 @@ class FakeStore:
     def forget_note(self, note_id):
         self.data["notes"] = [note for note in self.data["notes"] if note["id"] != note_id]
 
-    def add_reminder(self, text, due_at):
-        self.data["reminders"].append({"id": "reminder1", "text": text, "due_at": due_at, "done": False})
+    def add_reminder(self, text, due_at, repeat="once"):
+        self.data["reminders"].append({"id": "reminder" + str(len(self.data["reminders"]) + 1), "text": text, "due_at": due_at, "done": False, "repeat": repeat})
+
+    def update_reminder(self, reminder_id, text, due_at, repeat="once"):
+        for reminder in self.data["reminders"]:
+            if reminder["id"] == reminder_id:
+                reminder.update(text=text, due_at=due_at, repeat=repeat, done=False)
+
+    def delete_reminder(self, reminder_id):
+        self.data["reminders"] = [r for r in self.data["reminders"] if r["id"] != reminder_id]
 
     def complete_reminder(self, reminder_id):
         for reminder in self.data["reminders"]:
@@ -179,13 +187,61 @@ class CompanionHubTests(unittest.TestCase):
         self.assertEqual(self.store.data["reminders"][0]["text"], "喝一杯水")
         self.hub._complete_reminder("reminder1")
         self.assertTrue(self.store.data["reminders"][0]["done"])
-        for name in ("home", "memory", "growth", "settings"):
+        for name in ("home", "alarms", "memory", "growth", "settings"):
             self.hub.show_page(name)
             self.assertIs(self.hub.stack.currentWidget(), self.hub._pages[name])
         self.hub.show()
         self.app.processEvents()
         self.hub.close()
         self.assertFalse(self.hub.isVisible())
+
+    def test_alarm_editor_repeat_edit_delete_and_sound_are_real_controls(self):
+        self.hub.show_page("alarms")
+        self.hub.reminder_text.setText("工作日喝水")
+        self.hub.reminder_repeat.setCurrentIndex(self.hub.reminder_repeat.findData("weekdays"))
+        self.hub.alarm_save_button.click()
+        self.assertEqual(self.store.data["reminders"][0]["repeat"], "weekdays")
+        self.hub.alarm_list.setCurrentRow(0)
+        self.hub.alarm_edit_button.click()
+        self.assertEqual(self.hub.reminder_text.text(), "工作日喝水")
+        self.assertIn("编辑", self.hub.alarm_edit_status.text())
+        self.hub.reminder_text.setText("每天喝水")
+        self.hub.reminder_repeat.setCurrentIndex(self.hub.reminder_repeat.findData("daily"))
+        self.hub.alarm_save_button.click()
+        self.assertEqual(len(self.store.data["reminders"]), 1)
+        self.assertEqual(self.store.data["reminders"][0]["text"], "每天喝水")
+        self.assertEqual(self.store.data["reminders"][0]["repeat"], "daily")
+        self.hub.alarm_list.setCurrentRow(0)
+        self.hub.alarm_complete_button.click()
+        self.assertTrue(self.store.data["reminders"][0]["done"])
+        self.hub.alarm_list.setCurrentRow(0)
+        self.hub.alarm_delete_button.click()
+        self.assertEqual(self.store.data["reminders"], [])
+        changed = []
+        self.hub.settings_changed.connect(lambda: changed.append(True))
+        self.hub.alarm_sound_enabled.setChecked(False)
+        self.assertFalse(self.store.data["settings"]["alarm_sound_enabled"])
+        self.assertFalse(self.store.data["settings"]["voice_enabled"])
+        self.assertEqual(changed, [True])
+        self.assertIn("工作日", self.hub.reminder_repeat.toolTip())
+        self.assertIn("角色语音", self.hub.alarm_sound_enabled.toolTip())
+
+    def test_alarm_master_switch_is_obvious_and_does_not_disable_editing(self):
+        changed = []
+        self.hub.settings_changed.connect(lambda: changed.append(True))
+        self.assertTrue(self.hub.alarms_enabled.isChecked())
+        self.hub.alarms_enabled.click()
+        self.assertFalse(self.store.data["settings"]["alarms_enabled"])
+        self.assertIn("不弹窗、不响铃", self.hub.alarms_delivery_status.text())
+        self.hub.reminder_text.setText("关闭期间保存的闹钟")
+        self.hub.alarm_save_button.click()
+        self.assertEqual(self.store.data["reminders"][0]["text"], "关闭期间保存的闹钟")
+        self.assertFalse(self.hub.alarms_enabled.isChecked())
+        self.assertTrue(self.hub.alarm_sound_enabled.isChecked())
+        self.hub.alarms_enabled.click()
+        self.assertTrue(self.store.data["settings"]["alarms_enabled"])
+        self.assertEqual(changed, [True, True])
+        self.assertIn("重新开启", self.hub.alarms_enabled.toolTip())
 
     def test_refresh_preserves_unsaved_profile_edits(self):
         self.hub.profile_fields["nickname"].setText("还没保存")
