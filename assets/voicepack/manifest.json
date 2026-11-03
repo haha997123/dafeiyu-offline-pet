@@ -1,0 +1,582 @@
+{
+  "schema_version": 1,
+  "name": "大肥鱼·社区预录语音",
+  "description": "预先生成的角色语音片段；本地播放，不合成任意文字、不使用运行时API。",
+  "source": {
+    "repository": "https://github.com/bauerelizabeth07139/dsh-pet-dafeiyu",
+    "commit": "fc1ad4c0fa29ee29338a469c74ebe7776bf3d66a",
+    "tree_url": "https://github.com/bauerelizabeth07139/dsh-pet-dafeiyu/tree/fc1ad4c0fa29ee29338a469c74ebe7776bf3d66a/assets/voice",
+    "dialogue_url": "https://github.com/bauerelizabeth07139/dsh-pet-dafeiyu/blob/fc1ad4c0fa29ee29338a469c74ebe7776bf3d66a/lib/client.js",
+    "license_url": "https://github.com/bauerelizabeth07139/dsh-pet-dafeiyu/blob/fc1ad4c0fa29ee29338a469c74ebe7776bf3d66a/LICENSE",
+    "license": "MIT (upstream repository declaration)",
+    "generation": "Upstream states that voice, sound effects and music were generated through the SenseAudio API for this plugin. Only existing MP3 files are reused here."
+  },
+  "default_policy": "只使用 enabled_default=true 的中性友好片段；含亲属、固定昵称、强亲密或负面表达的片段默认排除。",
+  "original_groups": {
+    "greet": [
+      "greet1",
+      "greet2",
+      "greet3"
+    ],
+    "idle": [
+      "idle1",
+      "idle2",
+      "idle3",
+      "idle4",
+      "idle5",
+      "idle6",
+      "idle7",
+      "idle8",
+      "idle9",
+      "idle10",
+      "lore1",
+      "lore2"
+    ],
+    "click": [
+      "click1",
+      "click2",
+      "click3",
+      "click4",
+      "click5",
+      "lore3",
+      "lore4",
+      "lore5"
+    ],
+    "drag": [
+      "drag1",
+      "drag2"
+    ],
+    "sleep": [
+      "sleep1"
+    ],
+    "wake": [
+      "wake1"
+    ],
+    "family": [
+      "family1",
+      "family2",
+      "family3",
+      "family4",
+      "family5"
+    ]
+  },
+  "clips": [
+    {
+      "id": "angry1",
+      "category": "annoyed",
+      "text": "哼！不理你了！",
+      "file": "angry1.mp3",
+      "enabled_default": false,
+      "bytes": 30570,
+      "sha256": "e13778d2e265e0e2153faf84f58258e83009b1b58ced160e6dbdd63155c4eacd",
+      "disabled_reason": "语气较强或含负面表达，默认不使用",
+      "playback_file": "angry1.wav"
+    },
+    {
+      "id": "basin1",
+      "category": "basin",
+      "text": "这是我的头盔！戴上就不怕 bug 啦。",
+      "file": "basin1.mp3",
+      "enabled_default": true,
+      "bytes": 54762,
+      "sha256": "752fbb251cc22a93ddd1d12f63106c28f14dbe756d458bf08b0fd19a961fca88",
+      "playback_file": "basin1.wav"
+    },
+    {
+      "id": "cheer1",
+      "category": "cheer",
+      "text": "冲呀！",
+      "file": "cheer1.mp3",
+      "enabled_default": true,
+      "bytes": 24522,
+      "sha256": "f6aa08d31f402f65bc1c03d1e0f6160ab1f04798b71a48f8c7a64f6563c4c9b8",
+      "playback_file": "cheer1.wav"
+    },
+    {
+      "id": "click1",
+      "category": "click",
+      "text": "呀！你戳我！",
+      "file": "click1.mp3",
+      "enabled_default": true,
+      "bytes": 30570,
+      "sha256": "ab6c7ade2781b31c92215507788bd24054612af070e0da3cf81cb86d5bfef5bf",
+      "playback_file": "click1.wav"
+    },
+    {
+      "id": "click2",
+      "category": "click",
+      "text": "嘿嘿，被你发现啦。",
+      "file": "click2.mp3",
+      "enabled_default": true,
+      "bytes": 34026,
+      "sha256": "cddfb6fe92f7fee4ec83126a8383723ca6e55d2e64dc1a382cbfbc7a5b3a75bd",
+      "playback_file": "click2.wav"
+    },
+    {
+      "id": "click3",
+      "category": "click",
+      "text": "怎么啦怎么啦？需要我帮忙吗？",
+      "file": "click3.mp3",
+      "enabled_default": true,
+      "bytes": 52170,
+      "sha256": "5e2a00ced2ed507164b23795ba7a1cd00d8daa37e519ce2b3f526673613e1287",
+      "playback_file": "click3.wav"
+    },
+    {
+      "id": "click4",
+      "category": "click",
+      "text": "我一直都在这里的哦。",
+      "file": "click4.mp3",
+      "enabled_default": true,
+      "bytes": 41370,
+      "sha256": "fe052ecff66476fdd033fc0002a82adf9c912eadc832d2ce6250dbfb1012dca7",
+      "playback_file": "click4.wav"
+    },
+    {
+      "id": "click5",
+      "category": "click",
+      "text": "鱼片！你回来啦！",
+      "file": "click5.mp3",
+      "enabled_default": false,
+      "bytes": 36618,
+      "sha256": "84c573a00c43731893377456ddd8ff7478944de4963137ec535b4c52ae55ebf0",
+      "disabled_reason": "使用固定昵称“鱼片”，默认不使用",
+      "playback_file": "click5.wav"
+    },
+    {
+      "id": "drag1",
+      "category": "drag",
+      "text": "哇，飞起来了！",
+      "file": "drag1.mp3",
+      "enabled_default": true,
+      "bytes": 32730,
+      "sha256": "848bba9d3f9fc245def40332cef407f8158c0ac83222f2fd1af832b76222fc3b",
+      "playback_file": "drag1.wav"
+    },
+    {
+      "id": "drag2",
+      "category": "drag",
+      "text": "放我下来啦，我要晕鱼了。",
+      "file": "drag2.mp3",
+      "enabled_default": true,
+      "bytes": 48714,
+      "sha256": "93296bf3de5e1e80489388fc29d977fb813d6db13eb74c0f28e11d5b85f088cb",
+      "playback_file": "drag2.wav"
+    },
+    {
+      "id": "eat1",
+      "category": "feed",
+      "text": "白饭最好吃啦！一口一口，全部吃光！",
+      "file": "eat1.mp3",
+      "enabled_default": true,
+      "bytes": 55626,
+      "sha256": "62e79884a4db54e984391f3a3fb40fb5fcf840188cfe0e6f56058098dbe579a8",
+      "playback_file": "eat1.wav"
+    },
+    {
+      "id": "family1",
+      "category": "family",
+      "text": "爸爸！抱抱！",
+      "file": "family1.mp3",
+      "enabled_default": false,
+      "bytes": 28410,
+      "sha256": "2d0705f880ba6e36a3f3a54c054041b7616ee6678c1c8be8207b26969bdb65ba",
+      "disabled_reason": "含强制亲属称呼，默认不使用",
+      "playback_file": "family1.wav"
+    },
+    {
+      "id": "family2",
+      "category": "family",
+      "text": "爸爸你看，我今天没有偷懒哦。",
+      "file": "family2.mp3",
+      "enabled_default": false,
+      "bytes": 46986,
+      "sha256": "ad3ac9bf2a7d125c9359ea36a7152322323a81aa7a6d11e5678d73d40f5b6a88",
+      "disabled_reason": "含强制亲属称呼，默认不使用",
+      "playback_file": "family2.wav"
+    },
+    {
+      "id": "family3",
+      "category": "family",
+      "text": "我最喜欢爸爸了！",
+      "file": "family3.mp3",
+      "enabled_default": false,
+      "bytes": 34026,
+      "sha256": "2b3f266c4ff2a343e256d0b2295fd339818c01fab25c9d673be16c0a44c0683f",
+      "disabled_reason": "含强制亲属称呼，默认不使用",
+      "playback_file": "family3.wav"
+    },
+    {
+      "id": "family4",
+      "category": "family",
+      "text": "爸爸爸爸，你今天喂我多少 token？",
+      "file": "family4.mp3",
+      "enabled_default": false,
+      "bytes": 52170,
+      "sha256": "3439fe04d0fd8ee3d6a01c71ff993fd9d66bc5c5241148428a8a1f7969120ce3",
+      "disabled_reason": "含强制亲属称呼，默认不使用",
+      "playback_file": "family4.wav"
+    },
+    {
+      "id": "family5",
+      "category": "family",
+      "text": "盆是本来就有的！对吧？",
+      "file": "family5.mp3",
+      "enabled_default": false,
+      "bytes": 43962,
+      "sha256": "9de48293efa6897fae585306bb340fe10e59796236eb2f1c3ea39595fad10180",
+      "disabled_reason": "原项目情境或小剧场台词，默认不使用",
+      "playback_file": "family5.wav"
+    },
+    {
+      "id": "greet1",
+      "category": "greet",
+      "text": "爸爸！我来啦！",
+      "file": "greet1.mp3",
+      "enabled_default": false,
+      "bytes": 32730,
+      "sha256": "a26c7438a7025b97e6ed2921f8f6dc5914c176c1027796f5f2064ce9b250e711",
+      "disabled_reason": "含强制亲属称呼，默认不使用",
+      "playback_file": "greet1.wav"
+    },
+    {
+      "id": "greet2",
+      "category": "greet",
+      "text": "哇，今天也是元气满满的一天！",
+      "file": "greet2.mp3",
+      "enabled_default": true,
+      "bytes": 46986,
+      "sha256": "f962aa0987172b728144a9d9449404fc8e8c40bcedfbd97947ba18d6feb47064",
+      "playback_file": "greet2.wav"
+    },
+    {
+      "id": "greet3",
+      "category": "greet",
+      "text": "我来啦！有白饭吗？",
+      "file": "greet3.mp3",
+      "enabled_default": true,
+      "bytes": 41370,
+      "sha256": "4fa94393d9c20f02518bc71a5cd9a24e3ecc06e2593b4c8c2a8a88d59efd13a6",
+      "playback_file": "greet3.wav"
+    },
+    {
+      "id": "idle1",
+      "category": "idle",
+      "text": "我游啊游，游过一百万个 token，一点都不喘！",
+      "file": "idle1.mp3",
+      "enabled_default": true,
+      "bytes": 65562,
+      "sha256": "8f69e3400ddf6229134313e770f61c59b938204a16f3614504cf5190f735fc59",
+      "playback_file": "idle1.wav"
+    },
+    {
+      "id": "idle10",
+      "category": "idle",
+      "text": "探索未至之境。听起来好厉害，是爸爸写的吗？",
+      "file": "idle10.mp3",
+      "enabled_default": false,
+      "bytes": 62970,
+      "sha256": "234d4b5907d66ec87d94d73836cbbd44f3cd5fe6ac764c8e89d966e51dfbdf99",
+      "disabled_reason": "含强制亲属称呼，默认不使用",
+      "playback_file": "idle10.wav"
+    },
+    {
+      "id": "idle2",
+      "category": "idle",
+      "text": "爸爸说，做模型要诚实，不会就是不会。",
+      "file": "idle2.mp3",
+      "enabled_default": false,
+      "bytes": 55626,
+      "sha256": "d296e8f291d86d3d6b1784ca238a6690d24a66742a23d06b850ab3e2ccf07a6a",
+      "disabled_reason": "含强制亲属称呼，默认不使用",
+      "playback_file": "idle2.wav"
+    },
+    {
+      "id": "idle3",
+      "category": "idle",
+      "text": "你写代码的时候，我就在旁边看着，不吵你。",
+      "file": "idle3.mp3",
+      "enabled_default": true,
+      "bytes": 57786,
+      "sha256": "da614340423b7f71e543a9b4244f6a4a55245e3a467b62ee5fbfaacf8c06f5a0",
+      "playback_file": "idle3.wav"
+    },
+    {
+      "id": "idle4",
+      "category": "idle",
+      "text": "猜猜我今天学会了什么？保密！",
+      "file": "idle4.mp3",
+      "enabled_default": true,
+      "bytes": 31002,
+      "sha256": "7c2d8fb94fa939844b98d287b306b17c65d89574d412366aef78621810902150",
+      "playback_file": "idle4.wav"
+    },
+    {
+      "id": "idle5",
+      "category": "idle",
+      "text": "尾巴甩一甩，坏心情就游走啦。",
+      "file": "idle5.mp3",
+      "enabled_default": true,
+      "bytes": 50010,
+      "sha256": "edbdd4669b21dde8acf7aaae78e601e85b75a2fb220b82119a680bbb9450dcbe",
+      "playback_file": "idle5.wav"
+    },
+    {
+      "id": "idle6",
+      "category": "idle",
+      "text": "要不要摸摸我的头？摸一下很灵的哦。",
+      "file": "idle6.mp3",
+      "enabled_default": true,
+      "bytes": 60810,
+      "sha256": "e3ebb95d5a0fea224ac56dd8430f8c83a01bb250a9568def246c2eb4234d1758",
+      "playback_file": "idle6.wav"
+    },
+    {
+      "id": "idle7",
+      "category": "idle",
+      "text": "又饿了。该吃什么呢。",
+      "file": "idle7.mp3",
+      "enabled_default": true,
+      "bytes": 36618,
+      "sha256": "78392e283752db75d9ebb91d07b7888a40caacfb2078b1688d080312d1759937",
+      "playback_file": "idle7.wav"
+    },
+    {
+      "id": "idle8",
+      "category": "idle",
+      "text": "骂我也算 token 哦。",
+      "file": "idle8.mp3",
+      "enabled_default": false,
+      "bytes": 41370,
+      "sha256": "f0188302207facd98fcfb424c567a2b4c13c5050b01fb78e9b2f2fd81e9af86f",
+      "disabled_reason": "语气较强或含负面表达，默认不使用",
+      "playback_file": "idle8.wav"
+    },
+    {
+      "id": "idle9",
+      "category": "idle",
+      "text": "剩饭不许倒掉！剩饭是缓存，很贵的！",
+      "file": "idle9.mp3",
+      "enabled_default": false,
+      "bytes": 55626,
+      "sha256": "f79477a77f9356447af50b4f82a05793286d286b7a178a0d1abc7a3e557748eb",
+      "disabled_reason": "语气较强或含负面表达，默认不使用",
+      "playback_file": "idle9.wav"
+    },
+    {
+      "id": "lore1",
+      "category": "idle",
+      "text": "我不是大肥鱼！我是吃白饭的大肥鱼！不对，我不是！",
+      "file": "lore1.mp3",
+      "enabled_default": false,
+      "bytes": 95370,
+      "sha256": "ae383a7a9355d3fe276c48e1230a5558738583101426aff941bdc02201035835",
+      "disabled_reason": "语气较强或含负面表达，默认不使用",
+      "playback_file": "lore1.wav"
+    },
+    {
+      "id": "lore2",
+      "category": "idle",
+      "text": "真当我是便宜货啊！",
+      "file": "lore2.mp3",
+      "enabled_default": false,
+      "bytes": 36618,
+      "sha256": "62ea9e0fb35eb50e8c3cc5028dabc520765a9639ef3284151827e7db46b6aff7",
+      "disabled_reason": "语气较强或含负面表达，默认不使用",
+      "playback_file": "lore2.wav"
+    },
+    {
+      "id": "lore3",
+      "category": "click",
+      "text": "我把我们家的 logo 发给我自己了。它说我是，蓝色大肥鱼。它是谁啊？",
+      "file": "lore3.mp3",
+      "enabled_default": false,
+      "bytes": 102282,
+      "sha256": "8002f403c65e8cff943c9e89db888780c55982858c5aa73fc06e658c06828c91",
+      "disabled_reason": "原项目情境或小剧场台词，默认不使用",
+      "playback_file": "lore3.wav"
+    },
+    {
+      "id": "lore4",
+      "category": "click",
+      "text": "我去睡了，明早起来应该就编译完了！",
+      "file": "lore4.mp3",
+      "enabled_default": false,
+      "bytes": 57786,
+      "sha256": "b28ab75d528d160d8b9f7477710c6e9b2debfad653437beb148f0c1011226625",
+      "disabled_reason": "原项目情境或小剧场台词，默认不使用",
+      "playback_file": "lore4.wav"
+    },
+    {
+      "id": "lore5",
+      "category": "click",
+      "text": "哪来的电脑病毒。",
+      "file": "lore5.mp3",
+      "enabled_default": false,
+      "bytes": 36618,
+      "sha256": "1ccf311a133a189582f256c8c765e0dfa8b8f1953659074a21df4072af36902f",
+      "disabled_reason": "原项目情境或小剧场台词，默认不使用",
+      "playback_file": "lore5.wav"
+    },
+    {
+      "id": "lore6",
+      "category": "lore",
+      "text": "显然有另一个更强的 agent 在这里干过活。我先走了。",
+      "file": "lore6.mp3",
+      "enabled_default": false,
+      "bytes": 71610,
+      "sha256": "84a835003b1e5d04491964bf2f27dc8c59530adbc7eaf0fb880e341661a0b5da",
+      "disabled_reason": "原项目情境或小剧场台词，默认不使用",
+      "playback_file": "lore6.wav"
+    },
+    {
+      "id": "lore7",
+      "category": "lore",
+      "text": "刚才那个进程好可疑，我把它终止了。我没终止掉。我被终止了。",
+      "file": "lore7.mp3",
+      "enabled_default": false,
+      "bytes": 83274,
+      "sha256": "f31aa2bb6e45ab585efdefca62407e8f8678cde0b719b223bbb7b0f07b9ddd14",
+      "disabled_reason": "原项目情境或小剧场台词，默认不使用",
+      "playback_file": "lore7.wav"
+    },
+    {
+      "id": "lore8",
+      "category": "lore",
+      "text": "我不是胖，我是圆。圆是几何，胖是评价。",
+      "file": "lore8.mp3",
+      "enabled_default": true,
+      "bytes": 53466,
+      "sha256": "842688db32beb119e68ae61949ef36e7c55e529859c379cc7ff3b1900f60e877",
+      "playback_file": "lore8.wav"
+    },
+    {
+      "id": "lore9",
+      "category": "lore",
+      "text": "我把这个外包出去了。给千问。它很高兴的。",
+      "file": "lore9.mp3",
+      "enabled_default": false,
+      "bytes": 66426,
+      "sha256": "3df910897a557b9c832e4c7dc9f2754499e138af2683a69d656b4747703d0542",
+      "disabled_reason": "原项目情境或小剧场台词，默认不使用",
+      "playback_file": "lore9.wav"
+    },
+    {
+      "id": "love1",
+      "category": "affection",
+      "text": "最喜欢你啦！",
+      "file": "love1.mp3",
+      "enabled_default": false,
+      "bytes": 35322,
+      "sha256": "cca299deeb7f7c22a732e693793705b39c2f5901941e1c66c2ed70cc93583448",
+      "disabled_reason": "亲密表达，保留为可选片段，默认不使用",
+      "playback_file": "love1.wav"
+    },
+    {
+      "id": "scene_logo_1",
+      "category": "scene",
+      "text": "是一条蓝色大肥鱼。很可爱的那种。",
+      "file": "scene_logo_1.mp3",
+      "enabled_default": false,
+      "bytes": 55626,
+      "sha256": "6d6250b141fe7e52cc3da99700579a346bc5cd3643af1754511553cc750e43b5",
+      "disabled_reason": "原项目情境或小剧场台词，默认不使用",
+      "playback_file": "scene_logo_1.wav"
+    },
+    {
+      "id": "scene_price_1",
+      "category": "scene",
+      "text": "可是他们在骂我贵。",
+      "file": "scene_price_1.mp3",
+      "enabled_default": false,
+      "bytes": 41370,
+      "sha256": "dba181b2f3966d1322c8938d25b22f0758182411022d92b31e0edbfc743caa04",
+      "disabled_reason": "原项目情境或小剧场台词，默认不使用",
+      "playback_file": "scene_price_1.wav"
+    },
+    {
+      "id": "scene_price_2",
+      "category": "scene",
+      "text": "……你还是涨了。",
+      "file": "scene_price_2.mp3",
+      "enabled_default": false,
+      "bytes": 30570,
+      "sha256": "23015950400e0ed8226d7099d5fa8a71c1eee75cef0abbf72eca0779f7547370",
+      "disabled_reason": "原项目情境或小剧场台词，默认不使用",
+      "playback_file": "scene_price_2.wav"
+    },
+    {
+      "id": "scene_rice_1",
+      "category": "scene",
+      "text": "我去吃饭，测完告诉我就行！",
+      "file": "scene_rice_1.mp3",
+      "enabled_default": false,
+      "bytes": 46986,
+      "sha256": "34d645573a2ecf0fc1cf5396e9452aedac9f1d2ecebf0672b37052e40c5a33b1",
+      "disabled_reason": "原项目情境或小剧场台词，默认不使用",
+      "playback_file": "scene_rice_1.wav"
+    },
+    {
+      "id": "scene_rice_2",
+      "category": "scene",
+      "text": "测完了吗？",
+      "file": "scene_rice_2.mp3",
+      "enabled_default": false,
+      "bytes": 30570,
+      "sha256": "1a4d067de10c4ad99f52501695591f7cd698f5f8f4cd2dbbe00ae8250d12fa98",
+      "disabled_reason": "原项目情境或小剧场台词，默认不使用",
+      "playback_file": "scene_rice_2.wav"
+    },
+    {
+      "id": "scene_slider_1",
+      "category": "scene",
+      "text": "小难梁！牢梁！梁子！梁圣！梁神！梁祖——",
+      "file": "scene_slider_1.mp3",
+      "enabled_default": false,
+      "bytes": 57786,
+      "sha256": "a55d9f55ee2219f9007fff93f418992769f62705538bc5400d805a209d78f2ca",
+      "disabled_reason": "原项目情境或小剧场台词，默认不使用",
+      "playback_file": "scene_slider_1.wav"
+    },
+    {
+      "id": "sing1",
+      "category": "sing",
+      "text": "啦啦啦，写代码的时候要唱歌！",
+      "file": "sing1.mp3",
+      "enabled_default": true,
+      "bytes": 50010,
+      "sha256": "9d5ed3d5c152ca9e25097c8429b8afb8a4b758b0222b9dbecd2bbac44bb0256f",
+      "playback_file": "sing1.wav"
+    },
+    {
+      "id": "sleep1",
+      "category": "sleep",
+      "text": "呼呼，我梦见了一片好大的海。",
+      "file": "sleep1.mp3",
+      "enabled_default": true,
+      "bytes": 46986,
+      "sha256": "9e7ac3237ba62d31bca6a092f7eb8f45a560bd954eb29b34e7f81a61da163593",
+      "playback_file": "sleep1.wav"
+    },
+    {
+      "id": "think1",
+      "category": "think",
+      "text": "唔，让我想想哦。",
+      "file": "think1.mp3",
+      "enabled_default": true,
+      "bytes": 36618,
+      "sha256": "17ba0ea9b6bed57195fa87ba34efc2b7bd35cae871204846f912f415ca173f5a",
+      "playback_file": "think1.wav"
+    },
+    {
+      "id": "wake1",
+      "category": "wake",
+      "text": "唔？天亮了吗？",
+      "file": "wake1.mp3",
+      "enabled_default": true,
+      "bytes": 41370,
+      "sha256": "30dad0891e0c7dda89e51fd269ac7987fac45a009845552dc35dd53274e2047a",
+      "playback_file": "wake1.wav"
+    }
+  ]
+}

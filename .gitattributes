@@ -1,0 +1,31 @@
+# Source and documentation are UTF-8 text with LF line endings.
+* text=auto eol=lf
+*.py text eol=lf
+*.md text eol=lf
+*.txt text eol=lf
+*.json text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.toml text eol=lf
+*.ps1 text eol=lf
+.gitignore text eol=lf
+.gitattributes text eol=lf
+
+# Media and packaged programs must not undergo line-ending conversion.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.webp binary
+*.gif binary
+*.ico binary
+*.mp3 binary
+*.wav binary
+*.ogg binary
+*.webm binary
+*.mp4 binary
+*.zip binary
+*.7z binary
+*.exe binary
+*.dll binary
+*.pyd binary
+*.pdf binary

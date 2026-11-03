@@ -1,0 +1,95 @@
+[
+  {
+    "name": "PySide6",
+    "version": "6.8.3",
+    "license_files": [
+      "licenses/PySide6/LicenseRef-Qt-Commercial.txt"
+    ]
+  },
+  {
+    "name": "PySide6_Essentials",
+    "version": "6.8.3",
+    "license_files": [
+      "licenses/PySide6_Essentials/LicenseRef-Qt-Commercial.txt"
+    ]
+  },
+  {
+    "name": "PySide6_Addons",
+    "version": "6.8.3",
+    "license_files": [
+      "licenses/PySide6_Addons/LicenseRef-Qt-Commercial.txt"
+    ]
+  },
+  {
+    "name": "shiboken6",
+    "version": "6.8.3",
+    "license_files": [
+      "licenses/shiboken6/LicenseRef-Qt-Commercial.txt"
+    ]
+  },
+  {
+    "name": "Pillow",
+    "version": "11.3.0",
+    "license_files": [
+      "licenses/Pillow/licenses/LICENSE"
+    ]
+  },
+  {
+    "name": "psutil",
+    "version": "7.2.2",
+    "license_files": [
+      "licenses/psutil/LICENSE"
+    ]
+  },
+  {
+    "name": "PyInstaller",
+    "version": "6.22.3",
+    "license_files": [
+      "licenses/PyInstaller/licenses/COPYING.txt"
+    ]
+  },
+  {
+    "name": "pyinstaller-hooks-contrib",
+    "version": "2026.9",
+    "license_files": [
+      "licenses/pyinstaller-hooks-contrib/licenses/LICENSE"
+    ]
+  },
+  {
+    "name": "altgraph",
+    "version": "0.17.5",
+    "license_files": [
+      "licenses/altgraph/LICENSE"
+    ]
+  },
+  {
+    "name": "packaging",
+    "version": "26.3",
+    "license_files": [
+      "licenses/packaging/licenses/LICENSE",
+      "licenses/packaging/licenses/LICENSE.APACHE",
+      "licenses/packaging/licenses/LICENSE.BSD"
+    ]
+  },
+  {
+    "name": "pefile",
+    "version": "2024.8.26",
+    "license_files": [
+      "licenses/pefile/LICENSE"
+    ]
+  },
+  {
+    "name": "pywin32-ctypes",
+    "version": "0.2.3",
+    "license_files": [
+      "licenses/pywin32-ctypes/LICENSE.txt"
+    ]
+  },
+  {
+    "name": "Python",
+    "version": "3.10.6",
+    "license_files": [
+      "licenses/Python/LICENSE.txt"
+    ]
+  }
+]
